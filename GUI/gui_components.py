@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-
+import os
 import tkinter as tk
 from tkinter import messagebox, filedialog, scrolledtext, ttk
 import json
-from config import OAUTH_CREDENTIALS_FILE, DB_CONFIG, RULES_FILE
+import config  # Import the whole config module
 from mysql_db import create_database_if_not_exists, create_mysql_table
 from rules_engine import process_email_rules, fetch_and_store_emails
 
@@ -58,6 +58,7 @@ class RuleEditorWindow(tk.Toplevel):
         super().__init__(master)
         self.title("Rule Editor")
         self.geometry("800x500")
+        self.rules_applied = False  # Flag to indicate if rules were applied
         self.condition_rows = []
         self.action_rows = []
         self.create_widgets()
@@ -109,7 +110,7 @@ class RuleEditorWindow(tk.Toplevel):
         tk.Button(self, text="Add Action", command=self.add_action_row)\
             .pack(padx=10, pady=5, anchor="w")
         
-        # Button frame with Save and Exit buttons
+        # Button frame with Apply and Exit buttons
         btn_frame = tk.Frame(self)
         btn_frame.pack(padx=10, pady=10)
         tk.Button(btn_frame, text="Apply Rules", command=self.save_rules)\
@@ -159,9 +160,10 @@ class RuleEditorWindow(tk.Toplevel):
             "rules": rules,
             "actions": actions
         }
-        with open(RULES_FILE, "w") as f:
+        with open(config.RULES_FILE, "w") as f:
             json.dump(ruleset, f, indent=4)
         messagebox.showinfo("Success", "Rules saved successfully.")
+        self.rules_applied = True
         self.destroy()  # Close the rule editor window
 
 # ----------------- ConditionRow -----------------
@@ -227,16 +229,18 @@ class GmailCRUDApp(tk.Tk):
         self.db_password = tk.StringVar()
         self.db_name = tk.StringVar(value="gmailcrud")
         self.oauth_file = tk.StringVar(value="credentials.json")
-
         self.retrieval_method = tk.StringVar(value="Number of Messages")
         self.message_number = tk.StringVar(value="10")
         self.timeframe_number = tk.StringVar(value="7")
         self.timeframe_unit = tk.StringVar(value="Days")
-        
         self.create_widgets()
 
     def create_widgets(self):
-        # Configuration frame
+        self.build_config_frame()
+        self.build_ops_frame()
+        self.build_output_area()
+
+    def build_config_frame(self):
         config_frame = tk.LabelFrame(self, text="Configuration", padx=10, pady=10)
         config_frame.pack(fill="x", padx=10, pady=5)
         tk.Label(config_frame, text="MySQL Username:").grid(row=0, column=0, sticky="e")
@@ -274,7 +278,7 @@ class GmailCRUDApp(tk.Tk):
         tk.Button(config_frame, text="Save Configuration", command=self.update_config)\
             .grid(row=6, column=0, columnspan=3, pady=5)
 
-        # Operations frame
+    def build_ops_frame(self):
         ops_frame = tk.LabelFrame(self, text="Operations", padx=10, pady=10)
         ops_frame.pack(fill="x", padx=10, pady=5)
         tk.Button(ops_frame, text="Fetch Emails", command=self.fetch_emails)\
@@ -284,6 +288,7 @@ class GmailCRUDApp(tk.Tk):
         tk.Button(ops_frame, text="Exit", command=self.quit)\
             .grid(row=0, column=2, padx=5, pady=5)
 
+    def build_output_area(self):
         self.output_text = scrolledtext.ScrolledText(self, height=30)
         self.output_text.pack(fill="both", padx=10, pady=5)
 
@@ -303,20 +308,31 @@ class GmailCRUDApp(tk.Tk):
             self.oauth_file.set(file_path)
 
     def update_config(self):
-        global DB_CONFIG, OAUTH_CREDENTIALS_FILE
+        import config  # Import the module to reference its attributes
         if not self.db_user.get() or not self.db_password.get() or not self.db_name.get():
             messagebox.showerror("Error", "Please fill in MySQL username, password, and database name.")
             return
-        DB_CONFIG.clear()
-        DB_CONFIG.update({
+        # Update DB_CONFIG via the config module
+        config.DB_CONFIG.clear()
+        config.DB_CONFIG.update({
             "host": "localhost",
             "user": self.db_user.get(),
             "password": self.db_password.get(),
             "database": self.db_name.get()
         })
-        OAUTH_CREDENTIALS_FILE = self.oauth_file.get()
+        # Process the OAuth credentials file path
+        cred_path = self.oauth_file.get().strip()
+        if not os.path.isabs(cred_path):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            cred_path = os.path.join(base_dir, cred_path)
+        if not os.path.exists(cred_path):
+            messagebox.showerror("Error", f"Credentials file not found: {cred_path}")
+            return
+        print("Using OAuth credentials file at:", cred_path)
+        # Update the config module's variable
+        config.OAUTH_CREDENTIALS_FILE = cred_path
         self.append_output("Configuration updated.")
-        db_result = create_database_if_not_exists(DB_CONFIG)
+        db_result = create_database_if_not_exists(config.DB_CONFIG)
         self.append_output(db_result)
         table_result = create_mysql_table()
         self.append_output(table_result)
@@ -336,7 +352,9 @@ class GmailCRUDApp(tk.Tk):
     def open_rule_editor(self):
         editor = RuleEditorWindow(self)
         self.wait_window(editor)
-        self.process_emails()
+        # Only process emails if rules were applied
+        if getattr(editor, "rules_applied", False):
+            self.process_emails()
 
     def process_emails(self):
         self.update_config()
@@ -346,3 +364,7 @@ class GmailCRUDApp(tk.Tk):
     def append_output(self, text):
         self.output_text.insert(tk.END, text + "\n")
         self.output_text.see(tk.END)
+
+if __name__ == "__main__":
+    app = GmailCRUDApp()
+    app.mainloop()

@@ -4,6 +4,10 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
+# Append the parent directory (GUI) to sys.path so that modules can be imported.
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 # Import functions from your modules
 import gmail_api
 import rules_engine

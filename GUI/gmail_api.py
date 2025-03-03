@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
-
 import os
 import pickle
 from datetime import datetime
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from config import SCOPES, OAUTH_CREDENTIALS_FILE
+import config  # Import the whole config module
 
 def authenticate_gmail():
     """Authenticate with Gmail via OAuth and return the service object."""
     creds = None
-    if os.path.exists("token.pickle"):
-        with open("token.pickle", "rb") as token:
+    token_file = "token.pickle"
+    if os.path.exists(token_file):
+        with open(token_file, "rb") as token:
             creds = pickle.load(token)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            if not os.path.exists(OAUTH_CREDENTIALS_FILE):
+            if not os.path.exists(config.OAUTH_CREDENTIALS_FILE):
                 raise FileNotFoundError(
-                    f"Missing {OAUTH_CREDENTIALS_FILE}. Please provide your OAuth credentials file."
+                    f"Missing {config.OAUTH_CREDENTIALS_FILE}. Please provide your OAuth credentials file."
                 )
-            flow = InstalledAppFlow.from_client_secrets_file(OAUTH_CREDENTIALS_FILE, SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(config.OAUTH_CREDENTIALS_FILE, config.SCOPES)
             creds = flow.run_local_server(port=0)
-        with open("token.pickle", "wb") as token:
+        with open(token_file, "wb") as token:
             pickle.dump(creds, token)
     return build("gmail", "v1", credentials=creds)
 
@@ -42,15 +42,14 @@ def list_emails(service, message_count="50"):
         # Use desired_count or 100, whichever is smaller, for max_results per page.
         max_results = min(desired_count, 100)
     else:
-        query = message_count  # For example: "newer_than:7d"
-        max_results = 100  # Default value when using a query
+        query = message_count  # e.g., "newer_than:7d"
+        max_results = 100
 
     response = service.users().messages().list(
         userId="me", maxResults=max_results, q=query
     ).execute()
     messages.extend(response.get("messages", []))
     
-    # Continue paginating only if a numeric limit was provided and we haven't reached it yet
     while "nextPageToken" in response and (not message_count.isdigit() or len(messages) < desired_count):
         page_token = response["nextPageToken"]
         response = service.users().messages().list(
@@ -58,12 +57,10 @@ def list_emails(service, message_count="50"):
         ).execute()
         messages.extend(response.get("messages", []))
     
-    # If a numeric limit is specified, return only that many messages.
     if message_count.isdigit():
         messages = messages[:desired_count]
     
     return messages
-
 
 def get_email(service, msg_id):
     """

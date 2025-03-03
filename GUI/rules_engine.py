@@ -127,7 +127,7 @@ def process_actions(service, email_id, actions):
     Supported actions (as dictionaries):
       - {"action": "mark as read"}
       - {"action": "mark as unread"}
-      - {"action": "move message", "destination": "inbox"}
+      - {"action": "move message", "destination": "updates"}
     
     Args:
         service: The authenticated Gmail service.
