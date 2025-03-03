@@ -14,6 +14,7 @@ def create_database_if_not_exists(config_dict: dict) -> str:
     Returns:
         str: A message indicating whether the database is ready or an error occurred.
     """
+    connection = None
     try:
         connection = mysql.connector.connect(
             host=config_dict["host"],
@@ -27,7 +28,7 @@ def create_database_if_not_exists(config_dict: dict) -> str:
     except Error as e:
         return f"Error creating database: {e}"
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
 
@@ -38,6 +39,7 @@ def create_mysql_table() -> str:
     Returns:
         str: A message indicating whether the table is ready or an error occurred.
     """
+    connection = None
     try:
         connection = mysql.connector.connect(**config.DB_CONFIG)
         cursor = connection.cursor()
@@ -58,7 +60,7 @@ def create_mysql_table() -> str:
     except Error as e:
         return f"Error creating MySQL table: {e}"
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
 
@@ -72,6 +74,7 @@ def insert_email_mysql(email_data: dict) -> str:
     Returns:
         str: A message indicating whether the email was stored or an error occurred.
     """
+    connection = None
     try:
         connection = mysql.connector.connect(**config.DB_CONFIG)
         cursor = connection.cursor()
@@ -98,7 +101,7 @@ def insert_email_mysql(email_data: dict) -> str:
     except Error as e:
         return f"Error inserting email: {e}"
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
 
@@ -110,6 +113,7 @@ def fetch_emails_mysql():
         list: A list of dictionaries containing email data, or an error message as a string.
     """
     emails = []
+    connection = None
     try:
         connection = mysql.connector.connect(**config.DB_CONFIG)
         cursor = connection.cursor()
@@ -127,6 +131,6 @@ def fetch_emails_mysql():
     except Error as e:
         return f"Error fetching emails: {e}"
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()

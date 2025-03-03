@@ -10,7 +10,7 @@
     ],
     "actions": [
         {
-            "action": "mark as unread"
+            "action": "mark as read"
         }
     ]
 }

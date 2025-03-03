@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import threading
 import tkinter as tk
 from tkinter import messagebox, filedialog, scrolledtext, ttk
 import json
@@ -225,6 +226,8 @@ class GmailCRUDApp(tk.Tk):
         super().__init__()
         self.title("G-helper")
         self.geometry("700x700")
+        # New Server field added with default 'localhost'
+        self.server = tk.StringVar(value="localhost")
         self.db_user = tk.StringVar(value="root")
         self.db_password = tk.StringVar()
         self.db_name = tk.StringVar(value="gmailcrud")
@@ -243,28 +246,32 @@ class GmailCRUDApp(tk.Tk):
     def build_config_frame(self):
         config_frame = tk.LabelFrame(self, text="Configuration", padx=10, pady=10)
         config_frame.pack(fill="x", padx=10, pady=5)
-        tk.Label(config_frame, text="MySQL Username:").grid(row=0, column=0, sticky="e")
-        tk.Entry(config_frame, textvariable=self.db_user, width=25).grid(row=0, column=1, padx=5, pady=2)
-        tk.Label(config_frame, text="MySQL Password:").grid(row=1, column=0, sticky="e")
-        tk.Entry(config_frame, textvariable=self.db_password, show="*", width=25).grid(row=1, column=1, padx=5, pady=2)
-        tk.Label(config_frame, text="Database Name:").grid(row=2, column=0, sticky="e")
-        tk.Entry(config_frame, textvariable=self.db_name, width=25).grid(row=2, column=1, padx=5, pady=2)
-        tk.Label(config_frame, text="OAuth Credentials File:").grid(row=3, column=0, sticky="e")
-        tk.Entry(config_frame, textvariable=self.oauth_file, width=25).grid(row=3, column=1, padx=5, pady=2)
-        tk.Button(config_frame, text="Browse", command=self.browse_oauth_file).grid(row=3, column=2, padx=5, pady=2)
+        # Server field
+        tk.Label(config_frame, text="Server:").grid(row=0, column=0, sticky="e")
+        tk.Entry(config_frame, textvariable=self.server, width=25).grid(row=0, column=1, padx=5, pady=2)
+        
+        tk.Label(config_frame, text="MySQL Username:").grid(row=1, column=0, sticky="e")
+        tk.Entry(config_frame, textvariable=self.db_user, width=25).grid(row=1, column=1, padx=5, pady=2)
+        tk.Label(config_frame, text="MySQL Password:").grid(row=2, column=0, sticky="e")
+        tk.Entry(config_frame, textvariable=self.db_password, show="*", width=25).grid(row=2, column=1, padx=5, pady=2)
+        tk.Label(config_frame, text="Database Name:").grid(row=3, column=0, sticky="e")
+        tk.Entry(config_frame, textvariable=self.db_name, width=25).grid(row=3, column=1, padx=5, pady=2)
+        tk.Label(config_frame, text="OAuth Credentials File:").grid(row=4, column=0, sticky="e")
+        tk.Entry(config_frame, textvariable=self.oauth_file, width=25).grid(row=4, column=1, padx=5, pady=2)
+        tk.Button(config_frame, text="Browse", command=self.browse_oauth_file).grid(row=4, column=2, padx=5, pady=2)
         
         # Retrieval Method Section
-        tk.Label(config_frame, text="Retrieval Method:").grid(row=4, column=0, sticky="e")
+        tk.Label(config_frame, text="Retrieval Method:").grid(row=5, column=0, sticky="e")
         retrieval_options = ["Number of Messages", "Timeframe"]
         retrieval_menu = ttk.Combobox(config_frame, textvariable=self.retrieval_method, values=retrieval_options, width=22)
-        retrieval_menu.grid(row=4, column=1, padx=5, pady=2)
+        retrieval_menu.grid(row=5, column=1, padx=5, pady=2)
         retrieval_menu.bind("<<ComboboxSelected>>", self.update_retrieval_fields)
         
         # Frame for number of messages
         self.message_number_frame = tk.Frame(config_frame)
         tk.Label(self.message_number_frame, text="Number:").grid(row=0, column=0, sticky="e")
         tk.Entry(self.message_number_frame, textvariable=self.message_number, width=10).grid(row=0, column=1, padx=5)
-        self.message_number_frame.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=2)
+        self.message_number_frame.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=2)
         
         # Frame for timeframe
         self.timeframe_frame = tk.Frame(config_frame)
@@ -276,17 +283,16 @@ class GmailCRUDApp(tk.Tk):
         self.timeframe_frame.grid_forget()  # Hide timeframe frame by default
         
         tk.Button(config_frame, text="Save Configuration", command=self.update_config)\
-            .grid(row=6, column=0, columnspan=3, pady=5)
+            .grid(row=7, column=0, columnspan=3, pady=5)
 
     def build_ops_frame(self):
         ops_frame = tk.LabelFrame(self, text="Operations", padx=10, pady=10)
         ops_frame.pack(fill="x", padx=10, pady=5)
-        tk.Button(ops_frame, text="Fetch Emails", command=self.fetch_emails)\
-            .grid(row=0, column=0, padx=5, pady=5)
-        tk.Button(ops_frame, text="Apply Rules", command=self.open_rule_editor)\
-            .grid(row=0, column=1, padx=5, pady=5)
-        tk.Button(ops_frame, text="Exit", command=self.quit)\
-            .grid(row=0, column=2, padx=5, pady=5)
+        self.fetch_button = tk.Button(ops_frame, text="Fetch Emails", command=self.fetch_emails_threaded)
+        self.fetch_button.grid(row=0, column=0, padx=5, pady=5)
+        self.apply_button = tk.Button(ops_frame, text="Apply Rules", command=self.open_rule_editor_threaded)
+        self.apply_button.grid(row=0, column=1, padx=5, pady=5)
+        tk.Button(ops_frame, text="Exit", command=self.quit).grid(row=0, column=2, padx=5, pady=5)
 
     def build_output_area(self):
         self.output_text = scrolledtext.ScrolledText(self, height=30)
@@ -296,10 +302,10 @@ class GmailCRUDApp(tk.Tk):
         method = self.retrieval_method.get()
         if method == "Number of Messages":
             self.timeframe_frame.grid_forget()
-            self.message_number_frame.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=2)
+            self.message_number_frame.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=2)
         elif method == "Timeframe":
             self.message_number_frame.grid_forget()
-            self.timeframe_frame.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=2)
+            self.timeframe_frame.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=2)
 
     def browse_oauth_file(self):
         file_path = filedialog.askopenfilename(title="Select OAuth Credentials File",
@@ -309,13 +315,13 @@ class GmailCRUDApp(tk.Tk):
 
     def update_config(self):
         import config  # Import the module to reference its attributes
-        if not self.db_user.get() or not self.db_password.get() or not self.db_name.get():
-            messagebox.showerror("Error", "Please fill in MySQL username, password, and database name.")
+        if not self.server.get() or not self.db_user.get() or not self.db_password.get() or not self.db_name.get():
+            messagebox.showerror("Error", "Please fill in Server, MySQL username, password, and database name.")
             return
         # Update DB_CONFIG via the config module
         config.DB_CONFIG.clear()
         config.DB_CONFIG.update({
-            "host": "localhost",
+            "host": self.server.get().strip(),
             "user": self.db_user.get(),
             "password": self.db_password.get(),
             "database": self.db_name.get()
@@ -333,9 +339,33 @@ class GmailCRUDApp(tk.Tk):
         config.OAUTH_CREDENTIALS_FILE = cred_path
         self.append_output("Configuration updated.")
         db_result = create_database_if_not_exists(config.DB_CONFIG)
+        if db_result.startswith("Error"):
+            messagebox.showerror("Connection Error", f"Please check your connection.\n{db_result}")
+            return
         self.append_output(db_result)
         table_result = create_mysql_table()
+        if table_result.startswith("Error"):
+            messagebox.showerror("Connection Error", f"Please check your connection.\n{table_result}")
+            return
         self.append_output(table_result)
+
+    def run_task(self, task_func):
+        """Runs a task function in a separate thread and disables operation buttons."""
+        self.disable_ops_buttons()
+        def wrapper():
+            try:
+                task_func()
+            finally:
+                self.after(0, self.enable_ops_buttons)
+        threading.Thread(target=wrapper, daemon=True).start()
+
+    def disable_ops_buttons(self):
+        self.fetch_button.config(state="disabled")
+        self.apply_button.config(state="disabled")
+
+    def enable_ops_buttons(self):
+        self.fetch_button.config(state="normal")
+        self.apply_button.config(state="normal")
 
     def fetch_emails(self):
         self.update_config()
@@ -349,12 +379,18 @@ class GmailCRUDApp(tk.Tk):
         result = fetch_and_store_emails(msg_param)
         self.append_output(result)
 
+    def fetch_emails_threaded(self):
+        self.run_task(self.fetch_emails)
+
     def open_rule_editor(self):
         editor = RuleEditorWindow(self)
         self.wait_window(editor)
         # Only process emails if rules were applied
         if getattr(editor, "rules_applied", False):
             self.process_emails()
+
+    def open_rule_editor_threaded(self):
+        self.run_task(self.open_rule_editor)
 
     def process_emails(self):
         self.update_config()
@@ -366,5 +402,6 @@ class GmailCRUDApp(tk.Tk):
         self.output_text.see(tk.END)
 
 if __name__ == "__main__":
+    import threading  # Ensure threading is imported
     app = GmailCRUDApp()
     app.mainloop()
