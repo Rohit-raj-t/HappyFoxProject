@@ -416,8 +416,3 @@ class GmailCRUDApp(tk.Tk):
     def append_output(self, text):
         self.output_text.insert(tk.END, text + "\n")
         self.output_text.see(tk.END)
-
-if __name__ == "__main__":
-    import threading  # Ensure threading is available
-    app = GmailCRUDApp()
-    app.mainloop()
