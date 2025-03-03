@@ -1,0 +1,16 @@
+{
+    "match_policy": "All",
+    "rules": [
+        {
+            "field": "From",
+            "predicate": "contains",
+            "value": "Google"
+        }
+    ],
+    "actions": [
+        {
+            "action": "move message",
+            "destination": "updates"
+        }
+    ]
+}

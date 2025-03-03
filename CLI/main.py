@@ -3,7 +3,6 @@ import os
 import sys
 import pickle
 import json
-import argparse
 from datetime import datetime, timedelta
 
 # MySQL
@@ -17,10 +16,10 @@ from googleapiclient.discovery import build
 
 # ----------------- Global Configuration -----------------
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
-OAUTH_CREDENTIALS_FILE = "credentials.json"  # Can be updated via CLI
+OAUTH_CREDENTIALS_FILE = "credentials.json"  # Default value; can be changed interactively
 TOKEN_FILE = "token.pickle"
-RULES_FILE = "rules.json"  # JSON file with processing rules
-DB_CONFIG = {}  # To be populated via CLI (setup command)
+RULES_FILE = "rules.json"  # File that stores your rules
+DB_CONFIG = {}  # Will be set during setup
 
 # ----------------- Gmail API Functions -----------------
 def authenticate_gmail():
@@ -301,52 +300,62 @@ def fetch_and_store_emails(message_count="10"):
             output.append(f"Error processing message {msg['id']}: {e}")
     return "\n".join(output)
 
-# ----------------- CLI Interface -----------------
-def main():
-    parser = argparse.ArgumentParser(
-        description="Gmail CLI Application for rule-based email processing using MySQL."
-    )
-    subparsers = parser.add_subparsers(dest="command", help="Commands")
+# ----------------- Interactive CLI Loop -----------------
+def interactive_loop():
+    print("Welcome to the Gmail CLI Application (MySQL & Rules Engine)")
+    while True:
+        print("\nSelect an option:")
+        print("1. Setup configuration and database")
+        print("2. Fetch emails from Gmail and store them in MySQL")
+        print("3. Process stored emails using rules")
+        print("4. Exit")
+        choice = input("Enter choice (1-4): ").strip()
 
-    # Setup command: configure DB and OAuth file.
-    setup_parser = subparsers.add_parser("setup", help="Setup database and configuration.")
-    setup_parser.add_argument("--db-host", default="localhost", help="MySQL host (default: localhost)")
-    setup_parser.add_argument("--db-user", required=True, help="MySQL username")
-    setup_parser.add_argument("--db-password", required=True, help="MySQL password")
-    setup_parser.add_argument("--db-name", required=True, help="Database name")
-    setup_parser.add_argument("--oauth-file", default="credentials.json", help="Path to OAuth credentials file")
+        if choice == "1":
+            # Setup configuration
+            host = input("Enter MySQL host [default: localhost]: ").strip() or "localhost"
+            user = input("Enter MySQL username: ").strip()
+            password = input("Enter MySQL password: ").strip()
+            database = input("Enter MySQL database name: ").strip()
+            oauth_file = input("Enter path to OAuth credentials file [default: credentials.json]: ").strip() or "credentials.json"
+            global DB_CONFIG, OAUTH_CREDENTIALS_FILE
+            DB_CONFIG = {
+                "host": host,
+                "user": user,
+                "password": password,
+                "database": database
+            }
+            OAUTH_CREDENTIALS_FILE = oauth_file
+            print(create_database_if_not_exists(DB_CONFIG))
+            print(create_mysql_table())
 
-    # Fetch command: fetch emails from Gmail and store in DB.
-    fetch_parser = subparsers.add_parser("fetch", help="Fetch emails from Gmail and store them.")
-    fetch_parser.add_argument("--count", default="10", help="Number of messages to fetch")
-    fetch_parser.add_argument("--query", default="", help="Gmail query (overrides count)")
+        elif choice == "2":
+            # Fetch emails
+            method = input("Fetch by (1) Count or (2) Query? Enter 1 or 2: ").strip()
+            if method == "1":
+                count = input("Enter number of messages to fetch [default: 10]: ").strip() or "10"
+                result = fetch_and_store_emails(count)
+            elif method == "2":
+                query = input("Enter Gmail query (e.g., newer_than:7d): ").strip()
+                result = fetch_and_store_emails(query)
+            else:
+                result = "Invalid option for fetching emails."
+            print(result)
 
-    # Process command: apply rules and execute actions on stored emails.
-    process_parser = subparsers.add_parser("process", help="Process stored emails based on rules.")
+        elif choice == "3":
+            # Process emails based on rules
+            result = process_email_rules()
+            print(result)
 
-    args = parser.parse_args()
+        elif choice == "4":
+            print("Exiting application.")
+            break
 
-    if args.command == "setup":
-        global DB_CONFIG, OAUTH_CREDENTIALS_FILE
-        DB_CONFIG = {
-            "host": args.db_host,
-            "user": args.db_user,
-            "password": args.db_password,
-            "database": args.db_name
-        }
-        OAUTH_CREDENTIALS_FILE = args.oauth_file
-        print(create_database_if_not_exists(DB_CONFIG))
-        print(create_mysql_table())
-
-    elif args.command == "fetch":
-        message_count = args.query if args.query else args.count
-        print(fetch_and_store_emails(message_count))
-
-    elif args.command == "process":
-        print(process_email_rules())
-
-    else:
-        parser.print_help()
+        else:
+            print("Invalid choice. Please enter a number between 1 and 4.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        interactive_loop()
+    except KeyboardInterrupt:
+        print("\nExiting application.")
