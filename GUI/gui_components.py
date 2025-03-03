@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import tkinter as tk
 from tkinter import messagebox, filedialog, scrolledtext, ttk
 import json
@@ -226,11 +227,12 @@ class GmailCRUDApp(tk.Tk):
         self.db_password = tk.StringVar()
         self.db_name = tk.StringVar(value="gmailcrud")
         self.oauth_file = tk.StringVar(value="credentials.json")
-        # New variables for retrieval method
+
         self.retrieval_method = tk.StringVar(value="Number of Messages")
         self.message_number = tk.StringVar(value="10")
         self.timeframe_number = tk.StringVar(value="7")
         self.timeframe_unit = tk.StringVar(value="Days")
+        
         self.create_widgets()
 
     def create_widgets(self):
