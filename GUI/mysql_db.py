@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
 import mysql.connector
 from mysql.connector import Error
-import config  # Import the whole config module for consistent configuration access
+import config  # Using our project settings for consistent config
 
 def create_database_if_not_exists(config_dict: dict) -> str:
     """
-    Connects to MySQL and creates the specified database if it doesn't exist.
-
+    Connect to MySQL and make the database if it's not already there.
+    
     Args:
-        config_dict (dict): A dictionary containing MySQL connection details.
-                            Expected keys: host, user, password, database.
-
+        config_dict (dict): Should have your MySQL details like host, user, password, and database name.
+    
     Returns:
-        str: A message indicating whether the database is ready or an error occurred.
+        str: Tells you if the database is set up or if something went wrong.
     """
     connection = None
     try:
+        # Connect to the MySQL server with the given host, user, and password.
         connection = mysql.connector.connect(
             host=config_dict["host"],
             user=config_dict["user"],
             password=config_dict["password"]
         )
         cursor = connection.cursor()
+        # Create the database if it doesn't exist.
         cursor.execute(f"CREATE DATABASE IF NOT EXISTS {config_dict['database']}")
         connection.commit()
         return f"Database '{config_dict['database']}' is ready."
@@ -34,13 +35,14 @@ def create_database_if_not_exists(config_dict: dict) -> str:
 
 def create_mysql_table() -> str:
     """
-    Creates the 'emails' table in the specified database if it does not exist.
-
+    Set up the 'emails' table if it's not there yet.
+    
     Returns:
-        str: A message indicating whether the table is ready or an error occurred.
+        str: A message saying the table is set up or an error message if something went wrong.
     """
     connection = None
     try:
+        # Connect using our DB settings from the config.
         connection = mysql.connector.connect(**config.DB_CONFIG)
         cursor = connection.cursor()
         create_table_query = """
@@ -66,13 +68,13 @@ def create_mysql_table() -> str:
 
 def insert_email_mysql(email_data: dict) -> str:
     """
-    Inserts a fetched email into MySQL (or updates it if it already exists).
-
+    Insert a new email into MySQL (or update it if it's already there).
+    
     Args:
-        email_data (dict): A dictionary containing email details.
-
+        email_data (dict): Contains details about the email.
+    
     Returns:
-        str: A message indicating whether the email was stored or an error occurred.
+        str: A message that tells you if the email was stored or if an error happened.
     """
     connection = None
     try:
@@ -107,10 +109,10 @@ def insert_email_mysql(email_data: dict) -> str:
 
 def fetch_emails_mysql():
     """
-    Fetches all stored emails from MySQL and returns them as a list of dictionaries.
-
+    Grab all the emails stored in MySQL and return them as a list of dictionaries.
+    
     Returns:
-        list: A list of dictionaries containing email data, or an error message as a string.
+        list: A list of emails with their details, or a string error message if something goes wrong.
     """
     emails = []
     connection = None

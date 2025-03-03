@@ -3,12 +3,12 @@
 """
 rules_engine.py
 
-This module handles rule-based processing of emails:
-- It loads rules from a JSON file.
-- Evaluates each email against the rules.
-- Executes actions on emails that match the rules using the Gmail API.
-- It also provides a function to fetch and store emails from Gmail based on a given message count
-  or query (e.g., "newer_than:7d").
+This module handles rule-based email processing. It:
+- Loads rules from a JSON file.
+- Checks each email against those rules.
+- Runs actions on emails that match (like marking as read or moving them)
+  using the Gmail API.
+- Also has a function to grab emails from Gmail (by count or query) and store them.
 """
 
 import os
@@ -18,7 +18,7 @@ from gmail_api import authenticate_gmail
 from mysql_db import fetch_emails_mysql
 from config import RULES_FILE
 
-# Mapping from user-friendly label names to Gmail API label IDs.
+# Mapping from simple names to Gmail API label IDs.
 LABEL_MAPPING = {
     "inbox": "INBOX",
     "forum": "CATEGORY_FORUMS",
@@ -28,37 +28,31 @@ LABEL_MAPPING = {
 
 def load_rules():
     """
-    Loads the processing rules from the JSON file.
-    
-    Returns:
-        dict: The ruleset if the file exists and is valid; otherwise, None.
+    Load the rules from our JSON file.
+
+    If the file isn't there or is messed up, it prints an error and returns None.
     """
     if not os.path.exists(RULES_FILE):
-        print("Rules file not found. Please create a rules file using the Rule Editor.")
+        print("Rules file not found. Please create one using the Rule Editor.")
         return None
     with open(RULES_FILE, "r") as f:
         try:
             rules = json.load(f)
             return rules
         except json.JSONDecodeError:
-            print("Error decoding rules file. Please check its contents.")
+            print("Error decoding the rules file. Check its contents.")
             return None
 
 def match_condition(email_value, condition):
     """
-    Evaluates a single condition on the email value.
-    
-    For string fields, supports:
-      - contains, does not contain, equals, does not equal.
-    For datetime fields (e.g., Received Date/Time), supports:
-      - less than, greater than (interpreting the value as an integer, optionally in months).
-    
-    Args:
-        email_value: The value from the email (string or datetime).
-        condition (dict): A condition with keys 'predicate', 'value', and optionally 'unit'.
-        
-    Returns:
-        bool: True if the condition is met, False otherwise.
+    Check if a single condition passes for an email field.
+
+    For text fields, it handles:
+      - contains, does not contain, equals, and does not equal.
+    For dates (like the received date), it handles:
+      - less than or greater than, treating the value as a number (days or months).
+
+    Returns True if the condition is met, else False.
     """
     predicate = condition["predicate"].lower()
     value = condition["value"]
@@ -70,7 +64,7 @@ def match_condition(email_value, condition):
             return False
         unit = condition.get("unit", "days").lower()
         if unit == "months":
-            num *= 30  # approximate conversion to days
+            num *= 30  # rough conversion to days
         diff = (datetime.now(email_value.tzinfo) - email_value).days
         if predicate == "less than":
             return diff < num
@@ -89,20 +83,11 @@ def match_condition(email_value, condition):
 
 def evaluate_email(email, ruleset):
     """
-    Evaluates an email against a given ruleset.
-    
-    Uses alias mapping:
-      - For fields like "Received Date/Time", it uses the email's received_date.
-      - For the "Message" field, it uses the email's message.
-    
-    The overall match policy ("All" or "Any") is used to determine if the email meets the rules.
-    
-    Args:
-        email (dict): The email data.
-        ruleset (dict): The ruleset loaded from the rules file.
-    
-    Returns:
-        bool: True if the email meets the overall rules, False otherwise.
+    Check an email against a set of rules.
+
+    It maps fields like "Received Date/Time" to the email's received_date
+    and "Message" to the email's message. Depending on the overall match policy
+    ("All" or "Any"), it returns True if the email passes the rules.
     """
     results = []
     for condition in ruleset.get("rules", []):
@@ -122,20 +107,13 @@ def evaluate_email(email, ruleset):
 
 def process_actions(service, email_id, actions):
     """
-    Processes a list of actions on an email using the Gmail API.
-    
-    Supported actions (as dictionaries):
-      - {"action": "mark as read"}
-      - {"action": "mark as unread"}
-      - {"action": "move message", "destination": "updates"}
-    
-    Args:
-        service: The authenticated Gmail service.
-        email_id (str): The ID of the email to process.
-        actions (list): A list of action dictionaries.
-    
-    Returns:
-        str: A newline-separated string of action results.
+    Run a list of actions on an email using the Gmail API.
+
+    Supported actions include:
+      - Marking as read/unread.
+      - Moving the email (with a specified destination).
+      
+    Returns a string that summarizes what actions were taken.
     """
     output = []
     for action_dict in actions:
@@ -154,7 +132,7 @@ def process_actions(service, email_id, actions):
                 ).execute()
                 output.append(f"Email {email_id} marked as unread.")
             elif action_type == "move message":
-                # Get the user-selected destination and map it to a valid Gmail label
+                # Map the user-given destination to a Gmail label.
                 user_destination = action_dict.get("destination", "inbox").lower()
                 destination_label = LABEL_MAPPING.get(user_destination, user_destination.upper())
                 service.users().messages().modify(
@@ -171,11 +149,10 @@ def process_actions(service, email_id, actions):
 
 def process_email_rules():
     """
-    Loads the rules, fetches stored emails from MySQL, and for each email that matches
-    the rules, executes the specified actions via the Gmail API.
-    
-    Returns:
-        str: A newline-separated string with processing results.
+    Load the rules, grab emails from the database, and for each email that matches
+    the rules, run the specified actions via the Gmail API.
+
+    Returns a string with a summary of what happened.
     """
     ruleset = load_rules()
     if not ruleset:
@@ -189,23 +166,17 @@ def process_email_rules():
     output = []
     for email in emails:
         if evaluate_email(email, ruleset):
-            output.append(f"Email {email['email_id']} matches rules. Executing actions...")
+            output.append(f"Email {email['email_id']} matches rules. Running actions...")
             actions_output = process_actions(service, email["email_id"], ruleset["actions"])
             output.append(actions_output)
     return "\n".join(output)
 
 def fetch_and_store_emails(message_count="10"):
     """
-    Authenticates with Gmail, fetches a list of emails based on the message_count
-    parameter (which can be a digit or a query like 'newer_than:7d'), retrieves details for each,
-    and stores them in MySQL.
-    
-    Args:
-        message_count (str): A string representing either the total number of messages to fetch
-                             or a Gmail query (e.g., "newer_than:7d").
-                             
-    Returns:
-        str: A newline-separated string with the results of the fetch/store operations.
+    Log in to Gmail, grab emails (either a set number or using a query like 'newer_than:7d'),
+    get details for each email, and save them into our MySQL database.
+
+    Returns a summary string of what happened during the process.
     """
     from gmail_api import list_emails, get_email
     from mysql_db import insert_email_mysql

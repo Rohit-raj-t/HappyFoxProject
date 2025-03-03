@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# Global configuration shared among modules.
+# Global settings for our project, used across different modules.
 
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
-DB_CONFIG = {}  # This dict will be populated by the GUI.
-OAUTH_CREDENTIALS_FILE = "credentials.json"  # Default OAuth credentials file path.
-RULES_FILE = "rules.json"  # Default rules file path.
+SCOPES = ['https://www.googleapis.com/auth/gmail.modify']  # Permissions for Gmail API actions.
+DB_CONFIG = {}  # This will be filled in with database settings later by the GUI.
+OAUTH_CREDENTIALS_FILE = "credentials.json"  # Where our OAuth credentials are stored.
+RULES_FILE = "rules.json"  # File containing the rules for processing emails.

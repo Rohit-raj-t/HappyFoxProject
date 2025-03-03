@@ -4,7 +4,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, filedialog, scrolledtext, ttk
 import json
-import config  # Import the whole config module
+import config  # Using our config settings for everything
 from mysql_db import create_database_if_not_exists, create_mysql_table
 from rules_engine import process_email_rules, fetch_and_store_emails
 
@@ -20,27 +20,31 @@ class ActionRow(tk.Frame):
         self.create_widgets()
 
     def create_widgets(self):
+        # Dropdown to choose an action (default: Mark as Read)
         self.action_cb = ttk.Combobox(self, textvariable=self.action_var, values=self.ACTIONS, width=20)
         self.action_cb.grid(row=0, column=0, padx=2)
         self.action_cb.bind("<<ComboboxSelected>>", self.update_destination_visibility)
         
-        # Destination drop-down; only visible for Move Message.
+        # Dropdown for destination folder (only shows up if you choose "Move Message")
         self.destination_cb = ttk.Combobox(self, textvariable=self.destination_var, values=self.MOVE_DESTINATIONS, width=20)
         self.destination_cb.grid(row=0, column=1, padx=2)
         if self.action_var.get().lower() != "move message":
             self.destination_cb.grid_remove()
         
+        # Button to remove this action row
         self.remove_btn = tk.Button(self, text="Remove",
                                     command=lambda: self.master.master.remove_action_row(self))
         self.remove_btn.grid(row=0, column=2, padx=2)
 
     def update_destination_visibility(self, event=None):
+        # Show the destination dropdown only if "Move Message" is selected.
         if self.action_var.get().lower() == "move message":
             self.destination_cb.grid()
         else:
             self.destination_cb.grid_remove()
 
     def get_action(self):
+        # Get the action details in a simple dict format.
         action = self.action_var.get().strip()
         if not action:
             return None
@@ -54,26 +58,26 @@ class ActionRow(tk.Frame):
 
 # ----------------- Updated Rule Editor Window -----------------
 class RuleEditorWindow(tk.Toplevel):
-    """A Toplevel window for creating/editing processing rules."""
+    """A window for making or editing email processing rules."""
     def __init__(self, master):
         super().__init__(master)
         self.title("Rule Editor")
         self.geometry("800x500")
-        self.rules_applied = False  # Flag to indicate if rules were applied
+        self.rules_applied = False  # Flag to tell if the rules got applied
         self.condition_rows = []
         self.action_rows = []
         self.create_widgets()
 
     def create_widgets(self):
         instructions = (
-            "Enter your rules below. Each rule consists of a Condition with the following columns:\n"
-            "- Field: Choose from [From, To, Subject, Received Date/Time, Message]\n"
-            "- Predicate: For text fields use [contains, does not contain, equals, does not equal];\n"
+            "Enter your rules here. Each rule has a Condition with these columns:\n"
+            "- Field: Pick from [From, To, Subject, Received Date/Time, Message]\n"
+            "- Predicate: For text use [contains, does not contain, equals, does not equal];\n"
             "  for 'Received Date/Time' use [less than, greater than]\n"
-            "- Value: Enter the text to search for, or number of days/months (if applicable)\n"
-            "- Unit: Only applicable for 'Received Date/Time' (default is 'days', or select 'months')\n"
-            "\nBelow, add one or more Actions. You can add or remove actions.\n"
-            "For actions, select the action type. For 'Move Message', choose the destination folder."
+            "- Value: The text to look for, or a number for days/months (if needed)\n"
+            "- Unit: Only for 'Received Date/Time' (default is 'days', or you can pick 'months')\n"
+            "\nThen add one or more Actions. You can add or remove actions as you like.\n"
+            "For actions, choose the type. For 'Move Message', pick the destination folder."
         )
         tk.Label(self, text=instructions, justify="left").pack(padx=10, pady=5, anchor="w")
         
@@ -119,7 +123,7 @@ class RuleEditorWindow(tk.Toplevel):
         tk.Button(btn_frame, text="Exit", command=self.destroy)\
             .grid(row=0, column=1, padx=10)
         
-        # Start with one condition row and one action row by default
+        # Start off with one condition and one action by default
         self.add_condition_row()
         self.add_action_row()
 
@@ -142,6 +146,7 @@ class RuleEditorWindow(tk.Toplevel):
         self.condition_rows.remove(row)
 
     def save_rules(self):
+        # Collect rules from all condition rows.
         rules = []
         for row in self.condition_rows:
             cond = row.get_condition()
@@ -149,6 +154,7 @@ class RuleEditorWindow(tk.Toplevel):
                 messagebox.showerror("Error", "Please fill all condition fields correctly.")
                 return
             rules.append(cond)
+        # Collect actions from all action rows.
         actions = []
         for row in self.action_rows:
             act = row.get_action()
@@ -165,7 +171,7 @@ class RuleEditorWindow(tk.Toplevel):
             json.dump(ruleset, f, indent=4)
         messagebox.showinfo("Success", "Rules saved successfully.")
         self.rules_applied = True
-        self.destroy()  # Close the rule editor window
+        self.destroy()  # Close the Rule Editor
 
 # ----------------- ConditionRow -----------------
 class ConditionRow(tk.Frame):
@@ -182,21 +188,27 @@ class ConditionRow(tk.Frame):
         self.create_widgets()
 
     def create_widgets(self):
+        # Dropdown for field selection
         self.field_cb = ttk.Combobox(self, textvariable=self.field_var, values=self.FIELDS, width=18)
         self.field_cb.grid(row=0, column=0, padx=2)
         self.field_cb.bind("<<ComboboxSelected>>", self.update_predicates)
+        # Dropdown for predicate selection
         self.predicate_cb = ttk.Combobox(self, textvariable=self.predicate_var, values=self.PREDICATES_TEXT, width=18)
         self.predicate_cb.grid(row=0, column=1, padx=2)
+        # Entry for the value to check against
         self.value_entry = tk.Entry(self, textvariable=self.value_var, width=18)
         self.value_entry.grid(row=0, column=2, padx=2)
+        # Dropdown for time unit (only for date fields)
         self.unit_cb = ttk.Combobox(self, textvariable=self.unit_var, values=["days", "months"], width=18)
         self.unit_cb.grid(row=0, column=3, padx=2)
         self.unit_cb.grid_remove()
+        # Button to remove this condition row
         self.remove_btn = tk.Button(self, text="Remove",
                                     command=lambda: self.master.master.remove_condition_row(self))
         self.remove_btn.grid(row=0, column=4, padx=2)
 
     def update_predicates(self, event=None):
+        # If "Received Date/Time" is chosen, show date predicates and the unit dropdown.
         field = self.field_var.get()
         if field == "Received Date/Time":
             self.predicate_cb['values'] = self.PREDICATES_DATE
@@ -206,6 +218,7 @@ class ConditionRow(tk.Frame):
             self.unit_cb.grid_remove()
 
     def get_condition(self):
+        # Build a simple dict representing the condition.
         field = self.field_var.get().strip()
         predicate = self.predicate_var.get().strip()
         value = self.value_var.get().strip()
@@ -226,7 +239,7 @@ class GmailCRUDApp(tk.Tk):
         super().__init__()
         self.title("G-helper")
         self.geometry("700x700")
-        # New Server field added with default 'localhost'
+        # Configuration variables with default values
         self.server = tk.StringVar(value="localhost")
         self.db_user = tk.StringVar(value="root")
         self.db_password = tk.StringVar()
@@ -280,7 +293,7 @@ class GmailCRUDApp(tk.Tk):
         timeframe_unit_options = ["Days", "Months"]
         ttk.Combobox(self.timeframe_frame, textvariable=self.timeframe_unit, values=timeframe_unit_options, width=10)\
             .grid(row=0, column=2, padx=5)
-        self.timeframe_frame.grid_forget()  # Hide timeframe frame by default
+        self.timeframe_frame.grid_forget()  # Hide this by default
         
         tk.Button(config_frame, text="Save Configuration", command=self.update_config)\
             .grid(row=7, column=0, columnspan=3, pady=5)
@@ -299,6 +312,7 @@ class GmailCRUDApp(tk.Tk):
         self.output_text.pack(fill="both", padx=10, pady=5)
 
     def update_retrieval_fields(self, event=None):
+        # Switch between showing message number or timeframe options.
         method = self.retrieval_method.get()
         if method == "Number of Messages":
             self.timeframe_frame.grid_forget()
@@ -308,17 +322,19 @@ class GmailCRUDApp(tk.Tk):
             self.timeframe_frame.grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=2)
 
     def browse_oauth_file(self):
+        # Open a file dialog to select the OAuth credentials file.
         file_path = filedialog.askopenfilename(title="Select OAuth Credentials File",
                                                filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")])
         if file_path:
             self.oauth_file.set(file_path)
 
     def update_config(self):
-        import config  # Import the module to reference its attributes
+        import config  # Re-import config to update its variables
+        # Check that all the needed fields are filled in.
         if not self.server.get() or not self.db_user.get() or not self.db_password.get() or not self.db_name.get():
             messagebox.showerror("Error", "Please fill in Server, MySQL username, password, and database name.")
             return
-        # Update DB_CONFIG via the config module
+        # Update the global DB_CONFIG in our config module.
         config.DB_CONFIG.clear()
         config.DB_CONFIG.update({
             "host": self.server.get().strip(),
@@ -326,7 +342,7 @@ class GmailCRUDApp(tk.Tk):
             "password": self.db_password.get(),
             "database": self.db_name.get()
         })
-        # Process the OAuth credentials file path
+        # Make sure the OAuth file path is absolute.
         cred_path = self.oauth_file.get().strip()
         if not os.path.isabs(cred_path):
             base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -335,7 +351,7 @@ class GmailCRUDApp(tk.Tk):
             messagebox.showerror("Error", f"Credentials file not found: {cred_path}")
             return
         print("Using OAuth credentials file at:", cred_path)
-        # Update the config module's variable
+        # Update the OAuth credentials file in our config.
         config.OAUTH_CREDENTIALS_FILE = cred_path
         self.append_output("Configuration updated.")
         db_result = create_database_if_not_exists(config.DB_CONFIG)
@@ -350,7 +366,7 @@ class GmailCRUDApp(tk.Tk):
         self.append_output(table_result)
 
     def run_task(self, task_func):
-        """Runs a task function in a separate thread and disables operation buttons."""
+        """Run a task in a separate thread and disable operation buttons while it runs."""
         self.disable_ops_buttons()
         def wrapper():
             try:
@@ -385,7 +401,7 @@ class GmailCRUDApp(tk.Tk):
     def open_rule_editor(self):
         editor = RuleEditorWindow(self)
         self.wait_window(editor)
-        # Only process emails if rules were applied
+        # If rules were applied, process emails right away.
         if getattr(editor, "rules_applied", False):
             self.process_emails()
 
@@ -402,6 +418,6 @@ class GmailCRUDApp(tk.Tk):
         self.output_text.see(tk.END)
 
 if __name__ == "__main__":
-    import threading  # Ensure threading is imported
+    import threading  # Ensure threading is available
     app = GmailCRUDApp()
     app.mainloop()
