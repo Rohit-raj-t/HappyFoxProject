@@ -119,6 +119,17 @@ sensitive credentials.
 automating email management.
 * **Tkinter GUI:** The GUI is designed to be simple and intuitive, providing easy access to configuration, email
 fetching, and rule management functionalities.
+-----
+
+## Screenshots
+- Main-App
+  
+    <img src="https://github.com/user-attachments/assets/da88bc12-4ec4-4bf4-8736-d5e50d09acdd" alt="image" width="500" height="500">
+
+- Rule-Editor
+  
+    <img src="https://github.com/user-attachments/assets/253e2083-3a52-41d3-94fc-875bbd064886" alt="image" width="500" height="450">
+
 
 ---
 ---
