@@ -4,6 +4,7 @@ import sys
 import pickle
 import json
 from datetime import datetime, timedelta
+import getpass
 
 # MySQL
 import mysql.connector
@@ -314,9 +315,9 @@ def interactive_loop():
         if choice == "1":
             # Setup configuration
             host = input("Enter MySQL host [default: localhost]: ").strip() or "localhost"
-            user = input("Enter MySQL username: ").strip()
-            password = input("Enter MySQL password: ").strip()
-            database = input("Enter MySQL database name: ").strip()
+            user = input("Enter MySQL username [default: root]: ").strip() or "root"
+            password = getpass.getpass("Enter MySQL password : ").strip()
+            database = input("Enter MySQL database name [default: gmailcrud]: ").strip() or "gmailcrud"
             oauth_file = input("Enter path to OAuth credentials file [default: credentials.json]: ").strip() or "credentials.json"
             global DB_CONFIG, OAUTH_CREDENTIALS_FILE
             DB_CONFIG = {

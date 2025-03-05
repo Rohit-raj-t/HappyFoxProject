@@ -1,0 +1,15 @@
+{
+    "match_policy": "All",
+    "rules": [
+        {
+            "field": "From",
+            "predicate": "does not contain",
+            "value": "gWRRFVEwrgfewg"
+        }
+    ],
+    "actions": [
+        {
+            "action": "mark as unread"
+        }
+    ]
+}
