@@ -37,7 +37,7 @@ fetching, and rule management.
 ## Prerequisites
 ----------------
 
-* **Python 3.6+**
+* **Python 3.10+**
 * **Required Libraries:**
         + `tkinter` (bundled with Python)
         + `google-auth-oauthlib`
